@@ -5,11 +5,12 @@ import { InitialProductionSchema1791511200000 } from "../../migrations/179151120
 import { SubmissionAttemptEntity } from "../audit/entities/submission-attempt.entity";
 import { ProductionEventEntity } from "../production-events/entities/production-event.entity";
 import { ProductionSourceEntity } from "../production-sources/entities/production-source.entity";
+import { MqttChallengeEntity } from "../mqtt/entities/mqtt-challenge.entity";
 
 export function databaseOptions(): DataSourceOptions {
   const common = {
     type: "postgres" as const,
-    entities: [ProductionSourceEntity, ProductionEventEntity, SubmissionAttemptEntity],
+    entities: [ProductionSourceEntity, ProductionEventEntity, SubmissionAttemptEntity, MqttChallengeEntity],
     migrations: [InitialProductionSchema1791511200000],
     synchronize: false,
     logging: false,

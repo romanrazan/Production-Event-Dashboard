@@ -27,9 +27,19 @@ export class ProductionEventsService {
 
   processBatch(items: unknown[], context: ProcessContext, manager?: EntityManager): Promise<EventResult[]> {
     if (manager) return this.processBatchInTransaction(items, context, manager);
-    return this.dataSource.transaction("SERIALIZABLE", (transaction) =>
-      this.processBatchInTransaction(items, context, transaction),
-    );
+    return this.runSerializable((transaction) => this.processBatchInTransaction(items, context, transaction));
+  }
+
+  private async runSerializable<T>(work: (manager: EntityManager) => Promise<T>): Promise<T> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try { return await this.dataSource.transaction("SERIALIZABLE", work); }
+      catch (error) {
+        const code = (error as { code?: string }).code;
+        if ((code === "40001" || code === "40P01") && attempt < 2) continue;
+        throw error;
+      }
+    }
+    throw new Error("Unreachable transaction retry state");
   }
 
   private async processBatchInTransaction(
