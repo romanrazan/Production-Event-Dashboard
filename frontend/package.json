@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start -p 3001 -H 127.0.0.1",
     "lint": "eslint src",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

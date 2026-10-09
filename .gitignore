@@ -11,3 +11,6 @@ frontend/.env.local
 .DS_Store
 *.zip
 .pgdata/
+*.tsbuildinfo
+frontend/next-env.d.ts
+.claude/settings.local.json
