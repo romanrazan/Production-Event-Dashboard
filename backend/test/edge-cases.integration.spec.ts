@@ -37,11 +37,37 @@ describe("edge cases, concurrency and restart durability", () => {
     await http().post("/api/ack").send({ event_ids: [5] }).expect(400);
   });
 
-  test("quantities above PostgreSQL integer range are stored and summed exactly", async () => {
-    await http().post("/api/events").send([countEvent("BIG-1", "LINE-01", 3_000_000_000), countEvent("BIG-2", "LINE-01", 4)]).expect(200);
-    expect((await summary()).net_total).toBe(3_000_000_004);
-    const pending = (await http().get("/api/state?view=pending").expect(200)).body;
-    expect(pending[0].quantity).toBe(3_000_000_000);
+  test("change request: COUNT quantity must be an integer 1..500; rejections persisted and never counted", async () => {
+    const response = await http().post("/api/events").send([
+      countEvent("Q-450", "LINE-01", 450),
+      countEvent("Q-500", "LINE-01", 500),
+      countEvent("Q-501", "LINE-01", 501),
+      countEvent("Q-0", "LINE-01", 0),
+      countEvent("Q-NEG", "LINE-01", -3),
+      { ...countEvent("Q-DEC", "LINE-01"), quantity: 2.5 },
+      { ...countEvent("Q-STR", "LINE-01"), quantity: "5" },
+      { ...countEvent("Q-BOOL", "LINE-01"), quantity: true },
+    ]).expect(200);
+    expect(response.body.results.map((r: { status: string }) => r.status)).toEqual(
+      ["ACCEPTED", "ACCEPTED", "REJECTED", "REJECTED", "REJECTED", "REJECTED", "REJECTED", "REJECTED"]);
+    expect(response.body.results[2].message).toBe("COUNT quantity 501 is outside the allowed range 1-500");
+    const stored = await context.db.query("SELECT classification, error FROM submission_attempts WHERE event_id='Q-501'");
+    expect(stored).toEqual([{ classification: "REJECTED", error: "COUNT quantity 501 is outside the allowed range 1-500" }]);
+    expect(Number((await context.db.query("SELECT COUNT(*) AS n FROM production_events WHERE event_id='Q-501'"))[0].n)).toBe(0);
+    expect(await summary()).toEqual({ net_total: 950, processed_events: 2, pending_ack: 2, unresolved: 0, duplicates: 0, conflicts: 0, rejected_submissions: 6 });
+  });
+
+  test("change request: rejected_submissions counts REJECTED attempts only, filtered by attempted source", async () => {
+    expect((await summary()).rejected_submissions).toBe(0);
+    await http().post("/api/events").send(countEvent("R-1", "LINE-01", 5)).expect(200);
+    await http().post("/api/events").send(countEvent("R-1", "LINE-01", 5)).expect(200); // DUPLICATE
+    await http().post("/api/events").send(countEvent("R-1", "LINE-01", 6)).expect(200); // CONFLICT
+    await http().post("/api/events").send(voidEvent("R-V", "R-LATER", "LINE-01")).expect(200); // PENDING_REFERENCE
+    await http().post("/api/events").send([countEvent("R-BAD", "LINE-01", 501), countEvent("R-BAD", "LINE-01", 501)]).expect(200);
+    await http().post("/api/events").send([countEvent("R-BAD-2", "LINE-02", 0), null]).expect(200);
+    expect((await summary("LINE-01")).rejected_submissions).toBe(2); // attempts, not distinct IDs
+    expect((await summary("LINE-02")).rejected_submissions).toBe(1);
+    expect(await summary()).toMatchObject({ rejected_submissions: 4, duplicates: 1, conflicts: 1, unresolved: 1 });
   });
 
   test("cross-source VOID is rejected, reserves identity and is listed in exceptions", async () => {
@@ -88,9 +114,9 @@ describe("edge cases, concurrency and restart durability", () => {
     await http().post("/api/events").send([countEvent("A-1", "LINE-A", 4), countEvent("A-1", "LINE-A", 4), countEvent("A-1", "LINE-B", 4)]).expect(200);
     await http().post("/api/events").send({ source_id: "LINE-A", event_id: "BAD-A", type: "COUNT", quantity: 0, event_time: "2026-10-09T10:30:00Z" }).expect(200);
     await http().post("/api/events").send([7]).expect(200);
-    expect(await summary("LINE-A")).toEqual({ net_total: 4, processed_events: 1, pending_ack: 1, unresolved: 0, duplicates: 2, conflicts: 0 });
-    expect(await summary("LINE-B")).toEqual({ net_total: 6, processed_events: 1, pending_ack: 1, unresolved: 0, duplicates: 0, conflicts: 1 });
-    expect(await summary()).toEqual({ net_total: 10, processed_events: 2, pending_ack: 2, unresolved: 0, duplicates: 2, conflicts: 1 });
+    expect(await summary("LINE-A")).toEqual({ net_total: 4, processed_events: 1, pending_ack: 1, unresolved: 0, duplicates: 2, conflicts: 0, rejected_submissions: 1 });
+    expect(await summary("LINE-B")).toEqual({ net_total: 6, processed_events: 1, pending_ack: 1, unresolved: 0, duplicates: 0, conflicts: 1, rejected_submissions: 0 });
+    expect(await summary()).toEqual({ net_total: 10, processed_events: 2, pending_ack: 2, unresolved: 0, duplicates: 2, conflicts: 1, rejected_submissions: 2 });
     const allExceptions = (await http().get("/api/state?view=exceptions").expect(200)).body;
     const lineA = (await http().get("/api/state?view=exceptions&source_id=LINE-A").expect(200)).body;
     expect(allExceptions).toHaveLength(3); // conflict, invalid LINE-A item, sourceless primitive

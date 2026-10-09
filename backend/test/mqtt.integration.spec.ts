@@ -60,4 +60,27 @@ describe("MQTT challenge integration", () => {
       expect(handled.response.state.net_total).toBe(5);
     }
   });
+
+  test("change request: new responses carry seven state fields; an older stored response replays unchanged", async () => {
+    const created = await mqtt.handleMqttChallenge(challenge({ challenge_id: "CH-SEVEN", events: [countEvent("S-1"), countEvent("S-BAD", "LINE-01", 501)] }));
+    expect(created.response.status).toBe("COMPLETED");
+    if (created.response.status === "COMPLETED") {
+      expect(Object.keys(created.response.state)).toEqual(["net_total", "processed_events", "pending_ack", "unresolved", "duplicates", "conflicts", "rejected_submissions"]);
+      expect(created.response.results.map((r) => r.status)).toEqual(["ACCEPTED", "REJECTED"]);
+      expect(created.response.state).toMatchObject({ net_total: 5, rejected_submissions: 1 });
+    }
+    // Simulate a challenge persisted before the change request (six-field state) and confirm replay is byte-identical.
+    const legacyBody = challenge({ challenge_id: "CH-LEGACY", events: [countEvent("L-1")] });
+    const legacyResponse = JSON.stringify({ protocol_version: "1.0", candidate_id: "07", challenge_id: "CH-LEGACY", status: "COMPLETED",
+      processed_at: "2026-10-09T10:00:00.000Z", results: [{ event_id: "L-1", status: "ACCEPTED", message: "COUNT processed" }],
+      state: { net_total: 5, processed_events: 1, pending_ack: 1, unresolved: 0, duplicates: 0, conflicts: 0 } });
+    const { createHash } = await import("node:crypto");
+    const { canonicalJson } = await import("../src/production-events/domain/normalization");
+    await context.db.query(
+      "INSERT INTO mqtt_challenges (challenge_id, request_digest, request_payload, response_payload, status, processed_at, published_at) VALUES ($1,$2,$3::jsonb,$4,'COMPLETED',now(),now())",
+      ["CH-LEGACY", createHash("sha256").update(canonicalJson(legacyBody)).digest("hex"), JSON.stringify(legacyBody), legacyResponse]);
+    const replay = await mqtt.handleMqttChallenge(legacyBody);
+    expect(replay.replayed).toBe(true);
+    expect(JSON.stringify(replay.response)).toBe(legacyResponse);
+  });
 });

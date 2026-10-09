@@ -9,7 +9,7 @@ describe("events and state integration", () => {
 
   test("COUNT +5 updates the six-field durable summary", async () => {
     await request(context.app.getHttpServer()).post("/api/events").send(countEvent()).expect(200).expect({ results: [{ event_id: "EV-101", status: "ACCEPTED", message: "COUNT processed" }] });
-    await request(context.app.getHttpServer()).get("/api/state?view=summary").expect(200).expect({ net_total: 5, processed_events: 1, pending_ack: 1, unresolved: 0, duplicates: 0, conflicts: 0 });
+    await request(context.app.getHttpServer()).get("/api/state?view=summary").expect(200).expect({ net_total: 5, processed_events: 1, pending_ack: 1, unresolved: 0, duplicates: 0, conflicts: 0, rejected_submissions: 0 });
   });
 
   test("identical resubmission is audited without double counting", async () => {
@@ -26,7 +26,7 @@ describe("events and state integration", () => {
     const pending = await request(context.app.getHttpServer()).post("/api/events").send(voidEvent("VOID-1", "COUNT-LATE")).expect(200);
     expect(pending.body.results[0].status).toBe("PENDING_REFERENCE");
     await request(context.app.getHttpServer()).post("/api/events").send(countEvent("COUNT-LATE")).expect(200);
-    await request(context.app.getHttpServer()).get("/api/state?view=summary").expect(200).expect({ net_total: 0, processed_events: 2, pending_ack: 2, unresolved: 0, duplicates: 0, conflicts: 0 });
+    await request(context.app.getHttpServer()).get("/api/state?view=summary").expect(200).expect({ net_total: 0, processed_events: 2, pending_ack: 2, unresolved: 0, duplicates: 0, conflicts: 0, rejected_submissions: 0 });
   });
 
   test("mixed valid and invalid items preserve order and invalid audit evidence", async () => {

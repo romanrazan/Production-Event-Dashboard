@@ -21,7 +21,7 @@ The three business endpoints (`POST /api/events`, `GET /api/state`, `POST /api/a
 | `source_id` | non-empty string (trimmed), ≤120 chars |
 | `event_id` | non-empty string (trimmed), ≤160 chars, **globally unique** across all sources |
 | `type` | exactly `COUNT` or `VOID` (case-sensitive) |
-| `quantity` | COUNT: a positive JS safe integer, so `"5"`, `1.5`, `true` and `0` are all rejected. VOID: `null` or omitted |
+| `quantity` | COUNT: an integer from **1 to 500** inclusive (change request); `501`, `0`, negatives, `"5"`, `1.5` and `true` are rejected. VOID: `null` or omitted |
 | `target_event_id` | COUNT: `null` or omitted. VOID: a non-empty string naming a COUNT, and not the VOID's own `event_id` |
 | `event_time` | ISO 8601 date-time with an explicit zone (`Z` or `±hh:mm`). Calendar overflow (Feb 30, 24:00) is rejected. No freshness window |
 
@@ -92,7 +92,7 @@ Query: `view` = `summary` | `pending` | `exceptions` (required). `source_id` is 
 All six values come from **one SQL statement**, so they form a consistent snapshot.
 
 ```json
-{ "net_total": 5, "processed_events": 1, "pending_ack": 1, "unresolved": 0, "duplicates": 0, "conflicts": 0 }
+{ "net_total": 5, "processed_events": 1, "pending_ack": 1, "unresolved": 0, "duplicates": 0, "conflicts": 0, "rejected_submissions": 0 }
 ```
 
 | Field | Definition |
@@ -103,6 +103,7 @@ All six values come from **one SQL statement**, so they form a consistent snapsh
 | `unresolved` | VOIDs still `PENDING_REFERENCE` |
 | `duplicates` | number of stored DUPLICATE **attempts** |
 | `conflicts` | number of stored CONFLICT **attempts** |
+| `rejected_submissions` | number of stored REJECTED **attempts** (change request; filtered by attempted `source_id`) |
 
 Source filtering applies the event's stored `source_id` to logical events and the *attempted* `source_id` to duplicate and conflict attempts.
 

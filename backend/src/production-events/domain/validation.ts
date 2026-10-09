@@ -1,6 +1,10 @@
 import { EventValidation } from "./model";
 import { normalizeEvent } from "./normalization";
 
+/** Change request FSE-01: a single COUNT may report 1..500 pieces (inclusive). Shared by REST and MQTT. */
+export const COUNT_QUANTITY_MIN = 1;
+export const COUNT_QUANTITY_MAX = 500;
+
 const ISO_WITH_ZONE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|([+-])(\d{2}):(\d{2}))$/;
 
 function usableString(value: unknown): value is string {
@@ -46,8 +50,11 @@ export function validateEvent(raw: unknown): EventValidation {
   }
 
   if (event.type === "COUNT") {
-    if (!Number.isSafeInteger(event.quantity) || (event.quantity as number) <= 0) {
-      return fail("COUNT quantity must be a positive safe integer");
+    if (typeof event.quantity !== "number" || !Number.isInteger(event.quantity)) {
+      return fail(`COUNT quantity must be an integer between ${COUNT_QUANTITY_MIN} and ${COUNT_QUANTITY_MAX}`);
+    }
+    if (event.quantity < COUNT_QUANTITY_MIN || event.quantity > COUNT_QUANTITY_MAX) {
+      return fail(`COUNT quantity ${event.quantity} is outside the allowed range ${COUNT_QUANTITY_MIN}-${COUNT_QUANTITY_MAX}`);
     }
     if (event.target_event_id !== undefined && event.target_event_id !== null) {
       return fail("COUNT target_event_id must be null or omitted");

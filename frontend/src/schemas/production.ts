@@ -3,6 +3,7 @@ import { z } from "zod";
 export const stateSummarySchema = z.object({
   net_total: z.number(), processed_events: z.number(), pending_ack: z.number(),
   unresolved: z.number(), duplicates: z.number(), conflicts: z.number(),
+  rejected_submissions: z.number(),
 });
 
 export const eventResultSchema = z.object({

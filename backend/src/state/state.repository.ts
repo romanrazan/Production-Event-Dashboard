@@ -38,7 +38,9 @@ export class StateRepository {
         (SELECT COUNT(*) FROM submission_attempts a
           WHERE a.classification='DUPLICATE' AND ($1::varchar IS NULL OR a.source_id=$1))::int AS duplicates,
         (SELECT COUNT(*) FROM submission_attempts a
-          WHERE a.classification='CONFLICT' AND ($1::varchar IS NULL OR a.source_id=$1))::int AS conflicts`,
+          WHERE a.classification='CONFLICT' AND ($1::varchar IS NULL OR a.source_id=$1))::int AS conflicts,
+        (SELECT COUNT(*) FROM submission_attempts a
+          WHERE a.classification='REJECTED' AND ($1::varchar IS NULL OR a.source_id=$1))::int AS rejected_submissions`,
       [sourceId ?? null],
     )) as StateSummary[];
     const row = rows[0];
@@ -50,6 +52,7 @@ export class StateRepository {
       unresolved: row.unresolved,
       duplicates: row.duplicates,
       conflicts: row.conflicts,
+      rejected_submissions: row.rejected_submissions,
     };
   }
 

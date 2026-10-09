@@ -79,4 +79,10 @@ describe("production event domain", () => {
     expect(validateChallenge({ ...challenge, events: {} }, "07", now)).toMatchObject({ ok: false, code: "VALIDATION_ERROR" });
     expect(validateChallenge(challenge, "07", new Date("2026-10-09T10:01:00Z"))).toMatchObject({ ok: false, code: "CHALLENGE_EXPIRED" });
   });
+
+  test("change request: COUNT quantity boundaries 1..500", () => {
+    for (const ok of [1, 450, 500]) expect(validateEvent({ ...count, quantity: ok })).toMatchObject({ ok: true, value: { quantity: ok } });
+    for (const bad of [0, -1, 501, 1000, 2.5, "450", true, null]) expect(validateEvent({ ...count, quantity: bad })).toMatchObject({ ok: false });
+    expect(validateEvent({ ...count, quantity: 501 })).toMatchObject({ reason: "COUNT quantity 501 is outside the allowed range 1-500" });
+  });
 });

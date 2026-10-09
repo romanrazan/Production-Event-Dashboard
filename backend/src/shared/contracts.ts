@@ -21,6 +21,8 @@ export interface StateSummary {
   unresolved: number;
   duplicates: number;
   conflicts: number;
+  /** Stored submission attempts classified exactly REJECTED (attempts, not distinct IDs). */
+  rejected_submissions: number;
 }
 
 export type SubmissionTransport = "REST" | "MQTT";

@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCheck, CircleDotDashed, Copy, Gauge, Layers3 } from "lucide-react";
+import { AlertTriangle, Ban, CheckCheck, CircleDotDashed, Copy, Gauge, Layers3 } from "lucide-react";
 import { StateSummary } from "@/types/production";
 
 const metrics = [
@@ -8,14 +8,19 @@ const metrics = [
   { key: "unresolved", label: "Unresolved refs", hint: "VOID waiting for COUNT", icon: CircleDotDashed, accent: false },
   { key: "duplicates", label: "Duplicate attempts", hint: "Retried identical payloads", icon: Copy, accent: false },
   { key: "conflicts", label: "Conflicts", hint: "Reused ID, changed payload", icon: AlertTriangle, accent: false },
+  { key: "rejected_submissions", label: "Rejected Submissions", hint: "Stored REJECTED attempts", icon: Ban, accent: false, tone: "danger" },
 ] as const;
 
 export function SummaryCards({ summary, stale = false }: { summary: StateSummary; stale?: boolean }) {
   return <section className={`stats-grid ${stale ? "is-stale" : ""}`} aria-label="Production summary" aria-busy={stale}>
-    {metrics.map(({ key, label, hint, icon: Icon, accent }) => <article className={`metric ${accent ? "accent" : ""}`} key={key}>
+    {metrics.map((metric) => {
+      const { key, label, hint, icon: Icon, accent } = metric;
+      const danger = "tone" in metric && metric.tone === "danger";
+      return <article className={`metric ${accent ? "accent" : ""} ${danger ? "danger" : ""}`} key={key}>
       <div className="metric-head"><span>{label}</span><Icon size={17} /></div>
       <strong>{summary[key].toLocaleString()}</strong>
       <small>{hint}</small>
-    </article>)}
+    </article>;
+    })}
   </section>;
 }

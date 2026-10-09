@@ -44,9 +44,10 @@ export function Dashboard() {
       </div>
     </section>
     <form className="filter-bar" onSubmit={filter}>
-      <div><Search size={16} /><input aria-label="Filter by source ID" placeholder="Filter by source, e.g. LINE-01" value={sourceDraft} onChange={(event) => setSourceDraft(event.target.value)} /></div>
-      <button className="secondary" type="submit">Apply filter</button>
-      {source && <button className="text-button" type="button" onClick={clear}>Clear</button>}
+      <label htmlFor="source-filter" className="filter-label">Production Source</label>
+      <div><Search size={16} /><input id="source-filter" placeholder="e.g. LINE-01" value={sourceDraft} onChange={(event) => setSourceDraft(event.target.value)} /></div>
+      <button className="secondary" type="submit">Apply Filter</button>
+      <button className="text-button" type="button" onClick={clear} disabled={!source && !sourceDraft}>Clear Filter</button>
       <span><Database size={14} />{source ? `Showing ${source}` : "All production sources"}{poll.data && !snapshotMatchesFilter ? " · loading…" : ""}</span>
     </form>
     {stale && <div className="alert stale" role="status"><strong>Refresh failed.</strong> Showing the last successful database snapshot{poll.lastSuccess ? ` from ${poll.lastSuccess.toLocaleTimeString()}` : ""}. {poll.error}<button onClick={poll.refresh}><RefreshCw size={14} /> Retry</button></div>}

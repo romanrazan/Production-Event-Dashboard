@@ -211,3 +211,17 @@ tr.is-open td { background: #f8fbfc; border-bottom-color: transparent; }
   .challenge-counts > div:nth-child(2) { border-right: 0; }
   .challenge-counts > div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
 }
+
+/* Change request FSE-01: seventh (rejected) card and labelled source filter */
+.stats-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.metric.danger { background: var(--red-bg); border-color: #efcfcc; }
+.metric.danger:before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--red); }
+.metric.danger strong, .metric.danger .metric-head svg { color: var(--red); }
+.filter-label { margin: 0 0 0 8px; white-space: nowrap; font-size: 10px; }
+.filter-bar .text-button:disabled { opacity: .4; }
+@media (max-width: 1280px) { .stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 680px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .stats-grid .metric.danger { grid-column: 1 / -1; }
+  .filter-label { width: 100%; margin: 4px 6px 0; }
+}
