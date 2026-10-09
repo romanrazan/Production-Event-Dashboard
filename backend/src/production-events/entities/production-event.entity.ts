@@ -10,7 +10,12 @@ export class ProductionEventEntity {
   @Column({ name: "event_id", type: "varchar", length: 160 }) eventId!: string;
   @Column({ name: "source_id", type: "varchar", length: 120 }) sourceId!: string;
   @Column({ type: "varchar", length: 10 }) type!: ProductionEventType;
-  @Column({ type: "integer", nullable: true }) quantity!: number | null;
+  @Column({
+    type: "bigint",
+    nullable: true,
+    transformer: { to: (value: number | null) => value, from: (value: string | null) => (value === null ? null : Number(value)) },
+  })
+  quantity!: number | null;
   @Column({ name: "target_event_id", type: "varchar", length: 160, nullable: true }) targetEventId!: string | null;
   @Column({ name: "event_time", type: "timestamptz" }) eventTime!: Date;
   @CreateDateColumn({ name: "received_at", type: "timestamptz" }) receivedAt!: Date;

@@ -9,6 +9,7 @@ import { eventFingerprint } from "./domain/normalization";
 import { validateEvent } from "./domain/validation";
 import { ProductionEventEntity } from "./entities/production-event.entity";
 import { ProductionEventsRepository } from "./production-events.repository";
+import { runWithRetry } from "../database/transaction";
 
 export interface ProcessContext {
   transport: SubmissionTransport;
@@ -27,19 +28,7 @@ export class ProductionEventsService {
 
   processBatch(items: unknown[], context: ProcessContext, manager?: EntityManager): Promise<EventResult[]> {
     if (manager) return this.processBatchInTransaction(items, context, manager);
-    return this.runSerializable((transaction) => this.processBatchInTransaction(items, context, transaction));
-  }
-
-  private async runSerializable<T>(work: (manager: EntityManager) => Promise<T>): Promise<T> {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try { return await this.dataSource.transaction("SERIALIZABLE", work); }
-      catch (error) {
-        const code = (error as { code?: string }).code;
-        if ((code === "40001" || code === "40P01") && attempt < 2) continue;
-        throw error;
-      }
-    }
-    throw new Error("Unreachable transaction retry state");
+    return runWithRetry(this.dataSource, (transaction) => this.processBatchInTransaction(items, context, transaction));
   }
 
   private async processBatchInTransaction(
@@ -142,22 +131,37 @@ export class ProductionEventsService {
       reversedByEventId: null,
       acknowledgedAt: null,
     };
+    let result: EventResult;
     if (!target) {
       await this.events.create({ ...base, status: "PENDING_REFERENCE", reason: "Target COUNT has not arrived", completedAt: null }, manager);
-      return { event_id: event.event_id, status: "PENDING_REFERENCE", message: "Stored until the target COUNT arrives" };
+      result = { event_id: event.event_id, status: "PENDING_REFERENCE", message: "Stored until the target COUNT arrives" };
+    } else {
+      const rejection = this.voidRejection(target, event.source_id);
+      if (rejection) {
+        await this.events.create({ ...base, status: "REJECTED", reason: rejection, completedAt: null }, manager);
+        result = { event_id: event.event_id, status: "REJECTED", message: rejection };
+      } else {
+        target.reversedByEventId = event.event_id;
+        await this.events.save(target, manager);
+        await this.events.create({ ...base, status: "ACCEPTED", reason: null, completedAt: this.clock.now() }, manager);
+        result = { event_id: event.event_id, status: "ACCEPTED", message: "VOID applied" };
+      }
     }
-    const rejection = this.voidRejection(target, event.source_id);
-    if (rejection) {
-      await this.events.create({ ...base, status: "REJECTED", reason: rejection, completedAt: null }, manager);
-      return { event_id: event.event_id, status: "REJECTED", message: rejection };
-    }
-    target.reversedByEventId = event.event_id;
-    await this.events.save(target, manager);
-    await this.events.create({ ...base, status: "ACCEPTED", reason: null, completedAt: this.clock.now() }, manager);
-    return { event_id: event.event_id, status: "ACCEPTED", message: "VOID applied" };
+    await this.rejectPendingVoidsTargetingVoid(event.event_id, manager);
+    return result;
   }
 
-  private async resolvePendingVoids(count: ProductionEventEntity, manager: EntityManager): Promise<void> {
+  /** A pending VOID whose target turns out to be a VOID can never resolve; close it with a reason. */
+  private async rejectPendingVoidsTargetingVoid(voidEventId: string, manager: EntityManager): Promise<void> {
+    for (const candidate of await this.events.pendingVoids(voidEventId, manager)) {
+      candidate.status = "REJECTED";
+      candidate.reason = "VOID target must be a COUNT";
+      await this.events.save(candidate, manager);
+    }
+  }
+
+  /** First stored (lowest id) same-source pending VOID wins; others are rejected with reasons. */
+  async resolvePendingVoids(count: ProductionEventEntity, manager: EntityManager): Promise<void> {
     const candidates = await this.events.pendingVoids(count.eventId, manager);
     let winner: ProductionEventEntity | null = null;
     for (const candidate of candidates) {

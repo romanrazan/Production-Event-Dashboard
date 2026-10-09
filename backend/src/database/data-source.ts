@@ -2,6 +2,7 @@ import "reflect-metadata";
 import "dotenv/config";
 import { DataSource, DataSourceOptions } from "typeorm";
 import { InitialProductionSchema1791511200000 } from "../../migrations/1791511200000-InitialProductionSchema";
+import { WidenQuantityAndAuditIndexes1791600000000 } from "../../migrations/1791600000000-WidenQuantityAndAuditIndexes";
 import { SubmissionAttemptEntity } from "../audit/entities/submission-attempt.entity";
 import { ProductionEventEntity } from "../production-events/entities/production-event.entity";
 import { ProductionSourceEntity } from "../production-sources/entities/production-source.entity";
@@ -11,7 +12,7 @@ export function databaseOptions(): DataSourceOptions {
   const common = {
     type: "postgres" as const,
     entities: [ProductionSourceEntity, ProductionEventEntity, SubmissionAttemptEntity, MqttChallengeEntity],
-    migrations: [InitialProductionSchema1791511200000],
+    migrations: [InitialProductionSchema1791511200000, WidenQuantityAndAuditIndexes1791600000000],
     synchronize: false,
     logging: false,
   };
