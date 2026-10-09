@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: production_dev
+      POSTGRES_DB: production_events
+    ports:
+      - "55433:5432"
+    volumes:
+      - production_event_pgdata:/var/lib/postgresql/data
+      - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/10-init-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d production_events"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+volumes:
+  production_event_pgdata:

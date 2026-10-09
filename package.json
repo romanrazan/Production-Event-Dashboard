@@ -1,0 +1,25 @@
+{
+  "name": "production-event-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "engines": { "node": ">=22.13.0" },
+  "workspaces": ["backend", "frontend"],
+  "scripts": {
+    "dev:backend": "npm run dev -w backend",
+    "dev:frontend": "npm run dev -w frontend",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "lint": "npm run lint --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm test -w backend",
+    "test:integration": "npm run test:integration -w backend",
+    "db:migrate": "npm run migration:run -w backend",
+    "mqtt:simulate": "npm run mqtt:simulate -w backend"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "eslint": "^9.39.0",
+    "prettier": "^3.7.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.46.0"
+  }
+}
